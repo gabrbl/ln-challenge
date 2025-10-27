@@ -1,0 +1,45 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: catalog_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: catalog_db
+      MYSQL_USER: catalog_user
+      MYSQL_PASSWORD: catalog_pass
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
+    networks:
+      - catalog_network
+
+  app:
+    build: .
+    container_name: catalog_app
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: catalog_user
+      DB_PASSWORD: catalog_pass
+      DB_NAME: catalog_db
+      JWT_SECRET: your-secret-key-here
+      PORT: 3000
+      HOST: 0.0.0.0
+    ports:
+      - "3000:3000"
+    networks:
+      - catalog_network
+    volumes:
+      - ./src:/app/src
+    restart: on-failure
+
+
+volumes:
+  mysql_data:
+
+networks:
+  catalog_network:
+    driver: bridge

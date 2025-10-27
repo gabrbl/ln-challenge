@@ -1,0 +1,518 @@
+{
+  "info": {
+    "name": "Catalog Manager API",
+    "description": "Colección de endpoints para el gestor de catálogo. Challenge Backend.\n\n## Autenticación\nPrimero ejecuta el endpoint de Login para obtener un token JWT. El token se guardará automáticamente en las variables de colección.\n\n## Variables\n- `base_url`: URL base de la API (default: http://localhost:3000/api)\n- `token`: Token JWT para autenticación\n\n## Endpoints disponibles:\n- **Auth**: Login para obtener token JWT\n- **Products**: Búsqueda (SKU/descripción), listado y detalle de productos\n- **Orders**: Listado con filtros y creación de órdenes con validación de stock\n\n## Características:\n- Búsqueda por SKU, descripción corta y larga\n- Ordenamiento por fecha, precio y categoría\n- Paginación en todos los listados\n- Validación de stock en tiempo real\n- Gestión automática de precios vigentes",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "2.0.0"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000/api",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has token\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('token');",
+                  "    ",
+                  "    // Save token to collection variable",
+                  "    pm.collectionVariables.set(\"token\", responseJson.token);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"admin\",\n    \"password\": \"admin123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Endpoint de autenticación. Usa las credenciales:\n- Username: admin\n- Password: admin123\n\nEl token JWT se guardará automáticamente en las variables de colección."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Products",
+      "item": [
+        {
+          "name": "Search Products",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has pagination\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('data');",
+                  "    pm.expect(responseJson).to.have.property('pagination');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/search?q=samsung&orderBy=precio&order=DESC&page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["search"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "samsung",
+                  "description": "Término de búsqueda (requerido, mínimo 2 caracteres, máximo 100)"
+                },
+                {
+                  "key": "orderBy",
+                  "value": "precio",
+                  "description": "Campo de ordenamiento: created_at (fecha), precio, categoria (default: created_at)"
+                },
+                {
+                  "key": "order",
+                  "value": "DESC",
+                  "description": "Dirección: ASC (ascendente) o DESC (descendente) - default: DESC"
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Número de página (default: 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Resultados por página (default: 10, máximo: 100)"
+                }
+              ]
+            },
+            "description": "Busca productos por SKU, descripción corta o descripción larga.\n\n**Características:**\n- Búsqueda parcial (LIKE) en SKU y descripciones\n- Soporte completo para ordenamiento y paginación\n- Retorna precio actual vigente\n- Incluye información de categoría, tipo y estado\n\n**Ejemplos de búsqueda:**\n- Por SKU: q=SKU001\n- Por descripción: q=Samsung\n- General: q=tv\n\n**Ordenamiento:**\n- created_at: Fecha de creación (más recientes primero)\n- precio: Precio vigente (menor a mayor o viceversa)\n- categoria: Orden alfabético por categoría\n\n**Respuesta incluye:**\n- Array de productos encontrados\n- Paginación (page, limit, total, pages)\n- Slug generado para cada producto"
+          }
+        },
+        {
+          "name": "List Products",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Products meet criteria\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    if (responseJson.data && responseJson.data.length > 0) {",
+                  "        responseJson.data.forEach(product => {",
+                  "            pm.expect(product.qty).to.be.above(0);",
+                  "            pm.expect(product.ubicacion_imagen).to.not.be.null;",
+                  "            pm.expect(product.precio).to.be.above(0);",
+                  "        });",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/products?orderBy=created_at&order=DESC&page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["products"],
+              "query": [
+                {
+                  "key": "orderBy",
+                  "value": "created_at",
+                  "description": "Campo de ordenamiento: created_at, precio, categoria"
+                },
+                {
+                  "key": "order",
+                  "value": "DESC",
+                  "description": "Dirección: ASC o DESC"
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Número de página"
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Resultados por página"
+                },
+                {
+                  "key": "category",
+                  "value": "TV",
+                  "description": "Filtrar por categoría (código)",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Lista productos que cumplen con:\n- Cantidad > 0\n- Estado = 3 (Activo)\n- Con imagen\n- Precio > 0"
+          }
+        },
+        {
+          "name": "Get Product by Slug",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has product and related\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('id');",
+                  "    pm.expect(responseJson).to.have.property('related');",
+                  "    pm.expect(responseJson.related).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/products/televisor-samsung-qled-55-pulgadas-4k-ultra-hd-smart-tv",
+              "host": ["{{base_url}}"],
+              "path": ["products", "televisor-samsung-qled-55-pulgadas-4k-ultra-hd-smart-tv"]
+            },
+            "description": "Obtiene el detalle de un producto por su SLUG (generado a partir de la descripción larga). Incluye productos relacionados de la misma categoría."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "List Orders",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response is array\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/orders",
+              "host": ["{{base_url}}"],
+              "path": ["orders"],
+              "query": [
+                {
+                  "key": "order_id",
+                  "value": "1",
+                  "description": "ID del pedido",
+                  "disabled": true
+                },
+                {
+                  "key": "cuit",
+                  "value": "20-30716908-4",
+                  "description": "CUIT del cliente",
+                  "disabled": true
+                },
+                {
+                  "key": "created_at_min",
+                  "value": "2024-01-01T00:00:00",
+                  "description": "Fecha mínima de creación (ISO 8601)",
+                  "disabled": true
+                },
+                {
+                  "key": "created_at_max",
+                  "value": "2024-12-31T23:59:59",
+                  "description": "Fecha máxima de creación (ISO 8601)",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Lista órdenes con filtros opcionales:\n- **order_id**: Filtra por ID de pedido específico\n- **cuit**: Filtra por CUIT del cliente\n- **created_at_min/max**: Filtra por rango de fechas\n\n**Respuesta incluye:**\n- Información completa del pedido\n- Datos del cliente\n- Detalles del producto\n- Precio y cantidad\n\nRequiere autenticación JWT."
+          }
+        },
+        {
+          "name": "Create Order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test(\"Order created successfully\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('id');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"cliente_id\": 1,\n    \"producto_id\": 1,\n    \"cantidad_solicitada\": 2,\n    \"clase_entrega\": \"Express\",\n    \"condicion_pago_aplicada\": \"Contado\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/orders",
+              "host": ["{{base_url}}"],
+              "path": ["orders"]
+            },
+            "description": "Crea una nueva orden de compra.\n\n**Campos requeridos:**\n- cliente_id: ID del cliente (number)\n- producto_id: ID del producto (number)\n- cantidad_solicitada: Cantidad a comprar (number)\n\n**Campos opcionales:**\n- clase_entrega: Tipo de entrega (string, puede ser null)\n- condicion_pago_aplicada: Condición de pago (string, puede ser null)\n\n**Validaciones automáticas:**\n- Verifica que el producto tenga stock suficiente\n- No permite comprar productos con stock 0 o null\n- Valida que exista un precio vigente para el producto\n- Usa transacciones para garantizar consistencia de datos\n\n**Proceso:**\n1. Verifica stock disponible (con lock FOR UPDATE)\n2. Obtiene precio vigente actual\n3. Calcula precio total (precio × cantidad)\n4. Genera número de orden incremental\n5. Crea el pedido\n6. Actualiza el stock automáticamente\n7. Retorna la orden creada con todos los datos\n\n**Respuesta exitosa (201):**\n- ID de la orden\n- Número de orden\n- Fecha de circulación\n- Precio total\n- Información del cliente y producto\n\nRequiere autenticación JWT."
+          }
+        },
+        {
+          "name": "Create Order - Out of Stock",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Error message is correct\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson.message).to.eql(\"Validation Error\");",
+                  "    pm.expect(responseJson.description).to.include(\"Stock\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"cliente_id\": 1,\n    \"producto_id\": 8,\n    \"cantidad_solicitada\": 1,\n    \"clase_entrega\": \"Standard\",\n    \"condicion_pago_aplicada\": \"Tarjeta\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/orders",
+              "host": ["{{base_url}}"],
+              "path": ["orders"]
+            },
+            "description": "Ejemplo de error cuando se intenta comprar un producto sin stock.\n\nEl producto ID 8 tiene stock 0, por lo que devuelve:\n- Code: 400\n- Message: \"Validation Error\"\n- Description: \"Out of Stock\""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Error Examples",
+      "item": [
+        {
+          "name": "Unauthorized Request",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/orders",
+              "host": ["{{base_url}}"],
+              "path": ["orders"]
+            },
+            "description": "Ejemplo de request sin token JWT. Devuelve error 401 Unauthorized."
+          }
+        },
+        {
+          "name": "Invalid Search Query",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/search?q=a",
+              "host": ["{{base_url}}"],
+              "path": ["search"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "a",
+                  "description": "Query con solo 1 carácter"
+                }
+              ]
+            },
+            "description": "Búsqueda con menos de 2 caracteres.\n\nDevuelve:\n- Code: 400\n- Message: \"Validation Error\"\n- Description: \"Search query must be at least 2 characters\""
+          }
+        },
+        {
+          "name": "Product Not Found",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/products/producto-inexistente",
+              "host": ["{{base_url}}"],
+              "path": ["products", "producto-inexistente"]
+            },
+            "description": "Busca un producto con slug inexistente.\n\nDevuelve:\n- Code: 404\n- Message: \"Not Found\"\n- Description: \"Product not found\""
+          }
+        },
+        {
+          "name": "Missing Required Fields",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"producto_id\": 1\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/orders",
+              "host": ["{{base_url}}"],
+              "path": ["orders"]
+            },
+            "description": "Intenta crear una orden sin campos requeridos.\n\nDevuelve:\n- Code: 400\n- Message: \"Validation Error\"\n- Description: \"Missing required fields\""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health & Documentation",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            },
+            "description": "Verifica que el servidor esté funcionando correctamente.\n\nRetorna:\n- status: \"ok\"\n- timestamp: Fecha y hora actual en formato ISO"
+          }
+        },
+        {
+          "name": "API Documentation (Swagger)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/documentation",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["documentation"]
+            },
+            "description": "Abre la documentación interactiva de Swagger UI.\n\nPermite:\n- Ver todos los endpoints disponibles\n- Probar requests directamente desde el navegador\n- Ver schemas y ejemplos de respuesta"
+          }
+        }
+      ]
+    }
+  ]
+}
